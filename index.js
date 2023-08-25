@@ -88,7 +88,7 @@ app.get('/connectLive', (req, res) => {
   let game = req.body.game
   let email = req.body.email
 
-  pool.query(`SELECT * FROM user WHERE status = true AND email = '${email}' AND lisensi = '${lisensi}' AND game LIKE '%${game}%' AND tgl_expired > '${convertDateFormatFull(new Date())}' AND live = false`, (error, resultsCekLisensi) => {
+  pool.query(`SELECT * FROM user WHERE status = true AND email = '${email}' AND lisensi = '${lisensi}' AND game LIKE '%${game}%' AND tgl_expired > '${convertDateFormatFull(new Date())}'`, (error, resultsCekLisensi) => {
     if (error) {
       return res.status(400).send({
         error: 'Bad input'
@@ -100,57 +100,71 @@ app.get('/connectLive', (req, res) => {
         error: 'Gagal connect live!'
       })
     } else {
-      // Username of someone who is currently live
-      let tiktokUsername = username;
+      if (resultsCekLisensi[0].live) {
+        pool.query(`SELECT * FROM aktivitas WHERE email = '${email}' AND game = '${game}' ORDER BY no DESC`, (error, resultsCekLive) => {
+          if (resultsCekLive.length === 0) {
+            return res.status(400).send({
+              error: 'Gagal connect live!'
+            })
+          } else if (resultsCekLive[0].username_tiktok !== username) {
+            return res.status(400).send({
+              error: 'Gagal connect live!'
+            })
+          } else {
+            // Username of someone who is currently live
+            let tiktokUsername = username;
 
-      // Create a new wrapper object and pass the username
-      let tiktokLiveConnection = new WebcastPushConnection(tiktokUsername);
+            // Create a new wrapper object and pass the username
+            let tiktokLiveConnection = new WebcastPushConnection(tiktokUsername);
 
-      // Connect to the chat (await can be used as well)
-      tiktokLiveConnection.connect().then(state => {
-        console.info(`Connected to roomId ${state.roomId}`);
-        pool.query(`INSERT INTO aktivitas(email, username_tiktok, game, total_gift, tgl_live) VALUES('${email}', '${username}', '${game}', '0', '${convertDateFormatFull(new Date())}')`)
-        pool.query(`UPDATE user SET live = true WHERE email = '${email}'`)
-        res.status(200).send({ message: `Connected to roomId ${state.roomId}` })
-      }).catch(err => {
-        console.error('Failed to connect', err);
-        return res.status(400).send({ error: 'Failed to connect, ' + err })
-      })
+            // Connect to the chat (await can be used as well)
+            tiktokLiveConnection.connect().then(state => {
+              console.info(`Connected to roomId ${state.roomId}`);
+              pool.query(`INSERT INTO aktivitas(email, username_tiktok, game, total_gift, tgl_live) VALUES('${email}', '${username}', '${game}', '0', '${convertDateFormatFull(new Date())}')`)
+              pool.query(`UPDATE user SET live = true WHERE email = '${email}'`)
+              res.status(200).send({ message: `Connected to roomId ${state.roomId}` })
+            }).catch(err => {
+              console.error('Failed to connect', err);
+              return res.status(400).send({ error: 'Failed to connect, ' + err })
+            })
 
-      io.on('connection', (socket) => {
-        tiktokLiveConnection.on('chat', msg => socket.emit('chat', { room: `room_${username}`, message: msg }));
-        tiktokLiveConnection.on('roomUser', msg => socket.emit('roomUser', { room: `room_${username}`, message: msg }));
-        tiktokLiveConnection.on('member', msg => socket.emit('member', { room: `room_${username}`, message: msg }));
-        tiktokLiveConnection.on('chat', msg => socket.emit('chat', { room: `room_${username}`, message: msg }));
-        tiktokLiveConnection.on('gift', msg => {
-          socket.emit('gift', { room: `room_${username}`, message: msg });
-          pool.query(`SELECT * FROM aktivitas WHERE email = '${email}' AND username_tiktok = '${username}' AND game = '${game}' ORDER BY no DESC`, (error, resultsCekAktivitas) => {
-            let gift = resultsCekAktivitas[0].total_gift
-            let new_gift = Number(gift + msg.diamondCount)
-            pool.query(`UPDATE aktivitas SET total_gift = ${new_gift} WHERE no = ${resultsCekAktivitas[0].no}`)
-          })
-        });
-        tiktokLiveConnection.on('social', msg => socket.emit('social', { room: `room_${username}`, message: msg }));
-        tiktokLiveConnection.on('like', msg => socket.emit('like', { room: `room_${username}`, message: msg }));
-        tiktokLiveConnection.on('questionNew', msg => socket.emit('questionNew', { room: `room_${username}`, message: msg }));
-        tiktokLiveConnection.on('linkMicBattle', msg => socket.emit('linkMicBattle', { room: `room_${username}`, message: msg }));
-        tiktokLiveConnection.on('linkMicArmies', msg => socket.emit('linkMicArmies', { room: `room_${username}`, message: msg }));
-        tiktokLiveConnection.on('liveIntro', msg => socket.emit('liveIntro', { room: `room_${username}`, message: msg }));
-        tiktokLiveConnection.on('emote', msg => socket.emit('emote', { room: `room_${username}`, message: msg }));
-        tiktokLiveConnection.on('envelope', msg => socket.emit('envelope', { room: `room_${username}`, message: msg }));
-        tiktokLiveConnection.on('subscribe', msg => socket.emit('subscribe', { room: `room_${username}`, message: msg }));
-        tiktokLiveConnection.on('disconnected', reason => socket.emit('disconnected', `TikTok connection disconnected ${reason}`));
-        tiktokLiveConnection.on('streamEnd', () => {
-          socket.emit('streamEnd', 'live selesai');
-        });
+            io.on('connection', (socket) => {
+              tiktokLiveConnection.on('chat', msg => socket.emit('chat', { room: `room_${username}`, message: msg }));
+              tiktokLiveConnection.on('roomUser', msg => socket.emit('roomUser', { room: `room_${username}`, message: msg }));
+              tiktokLiveConnection.on('member', msg => socket.emit('member', { room: `room_${username}`, message: msg }));
+              tiktokLiveConnection.on('chat', msg => socket.emit('chat', { room: `room_${username}`, message: msg }));
+              tiktokLiveConnection.on('gift', msg => {
+                socket.emit('gift', { room: `room_${username}`, message: msg });
+                pool.query(`SELECT * FROM aktivitas WHERE email = '${email}' AND username_tiktok = '${username}' AND game = '${game}' ORDER BY no DESC`, (error, resultsCekAktivitas) => {
+                  let gift = resultsCekAktivitas[0].total_gift
+                  let new_gift = Number(gift + msg.diamondCount)
+                  pool.query(`UPDATE aktivitas SET total_gift = ${new_gift} WHERE no = ${resultsCekAktivitas[0].no}`)
+                })
+              });
+              tiktokLiveConnection.on('social', msg => socket.emit('social', { room: `room_${username}`, message: msg }));
+              tiktokLiveConnection.on('like', msg => socket.emit('like', { room: `room_${username}`, message: msg }));
+              tiktokLiveConnection.on('questionNew', msg => socket.emit('questionNew', { room: `room_${username}`, message: msg }));
+              tiktokLiveConnection.on('linkMicBattle', msg => socket.emit('linkMicBattle', { room: `room_${username}`, message: msg }));
+              tiktokLiveConnection.on('linkMicArmies', msg => socket.emit('linkMicArmies', { room: `room_${username}`, message: msg }));
+              tiktokLiveConnection.on('liveIntro', msg => socket.emit('liveIntro', { room: `room_${username}`, message: msg }));
+              tiktokLiveConnection.on('emote', msg => socket.emit('emote', { room: `room_${username}`, message: msg }));
+              tiktokLiveConnection.on('envelope', msg => socket.emit('envelope', { room: `room_${username}`, message: msg }));
+              tiktokLiveConnection.on('subscribe', msg => socket.emit('subscribe', { room: `room_${username}`, message: msg }));
+              tiktokLiveConnection.on('disconnected', reason => socket.emit('disconnected', `TikTok connection disconnected ${reason}`));
+              tiktokLiveConnection.on('streamEnd', () => {
+                socket.emit('streamEnd', 'live selesai');
+              });
 
-        socket.on('dc', () => {
-          if (tiktokLiveConnection) {
-            tiktokLiveConnection.disconnect();
+              socket.on('dc', () => {
+                if (tiktokLiveConnection) {
+                  tiktokLiveConnection.disconnect();
+                }
+                pool.query(`UPDATE user SET live = false WHERE email = '${email}'`)
+              });
+            });
           }
-          pool.query(`UPDATE user SET live = false WHERE email = '${email}'`)
-        });
-      });
+        })
+      }
     }
   })
 })
