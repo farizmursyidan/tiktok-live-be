@@ -1,12 +1,16 @@
-const { Pool } = require('pg')
+const mysql = require('mysql')
 
-const pool = new Pool({
-    user: 'postgres',
+const pool = new mysql.createConnection({
+    user: 'admin',
+    password: 'admin',
     host: 'localhost',
-    database: 'tiktok_live',
-    password: 'root',
-    port: 5432,
+    database: 'tiktok_live'
 })
+
+pool.connect(function (err) {
+    if (err) throw err;
+    console.log("Connected!");
+});
 
 module.exports = {
     pool

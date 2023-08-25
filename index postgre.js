@@ -28,19 +28,19 @@ function getUnauthorizedResponse(req) {
 }
 
 app.get('/user', (req, res) => {
-  pool.query(`SELECT * FROM user ORDER BY no ASC`, (error, results) => {
+  pool.query(`SELECT * FROM tiktok_live.user ORDER BY no ASC`, (error, results) => {
     if (error) {
       return res.status(400).send({
         error: 'Bad input'
       })
     }
-    res.status(200).send({ user_list: results })
+    res.status(200).send({ user_list: results.rows })
   })
 })
 
 app.patch('/user', (req, res) => {
   let data = req.body.data
-  pool.query(`UPDATE user SET status = ${data.status}, email = '${data.email}', lisensi = '${data.lisensi}', game = '${data.game}', tgl_expired = '${data.tgl_expired}', live = ${data.live} WHERE no = ${data.no}`, (error, results) => {
+  pool.query(`UPDATE tiktok_live.user SET status = ${data.status}, email = '${data.email}', lisensi = '${data.lisensi}', game = '${data.game}', tgl_expired = '${data.tgl_expired}', live = ${data.live} WHERE no = ${data.no}`, (error, results) => {
     if (error) {
       return res.status(400).send({
         error: 'Bad input'
@@ -52,7 +52,7 @@ app.patch('/user', (req, res) => {
 
 app.post('/user', (req, res) => {
   let data = req.body.data
-  pool.query(`INSERT INTO user(status, email, lisensi, game, tgl_expired) VALUES(${data.status}, '${data.email}', '${data.lisensi}', '${data.game}', '${data.tgl_expired}')`, (error, results) => {
+  pool.query(`INSERT INTO tiktok_live.user(status, email, lisensi, game, tgl_expired) VALUES(${data.status}, '${data.email}', '${data.lisensi}', '${data.game}', '${data.tgl_expired}')`, (error, results) => {
     if (error) {
       return res.status(400).send({
         error: 'Bad input'
@@ -63,13 +63,13 @@ app.post('/user', (req, res) => {
 })
 
 app.get('/aktivitas', (req, res) => {
-  pool.query(`SELECT * FROM aktivitas ORDER BY no DESC`, (error, results) => {
+  pool.query(`SELECT * FROM tiktok_live.aktivitas ORDER BY no DESC`, (error, results) => {
     if (error) {
       return res.status(400).send({
         error: 'Bad input'
       })
     }
-    res.status(200).send({ aktivitas: results })
+    res.status(200).send({ aktivitas: results.rows })
   })
 })
 
@@ -88,14 +88,14 @@ app.get('/connectLive', (req, res) => {
   let game = req.body.game
   let email = req.body.email
 
-  pool.query(`SELECT * FROM user WHERE status = true AND email = '${email}' AND lisensi = '${lisensi}' AND game LIKE '%${game}%' AND tgl_expired > '${convertDateFormatFull(new Date())}' AND live = false`, (error, resultsCekLisensi) => {
+  pool.query(`SELECT * FROM tiktok_live.user WHERE status = true AND email = '${email}' AND lisensi = '${lisensi}' AND game LIKE '%${game}%' AND tgl_expired > '${convertDateFormatFull(new Date())}' AND live = false`, (error, resultsCekLisensi) => {
     if (error) {
       return res.status(400).send({
         error: 'Bad input'
       })
     }
 
-    if (resultsCekLisensi.length === 0) {
+    if (resultsCekLisensi.rows.length === 0) {
       return res.status(400).send({
         error: 'Gagal connect live!'
       })
@@ -109,8 +109,8 @@ app.get('/connectLive', (req, res) => {
       // Connect to the chat (await can be used as well)
       tiktokLiveConnection.connect().then(state => {
         console.info(`Connected to roomId ${state.roomId}`);
-        pool.query(`INSERT INTO aktivitas(email, username_tiktok, game, total_gift, tgl_live) VALUES('${email}', '${username}', '${game}', '0', '${convertDateFormatFull(new Date())}')`)
-        pool.query(`UPDATE user SET live = true WHERE email = '${email}'`)
+        pool.query(`INSERT INTO tiktok_live.aktivitas(email, username_tiktok, game, total_gift, tgl_live) VALUES('${email}', '${username}', '${game}', '0', '${convertDateFormatFull(new Date())}')`)
+        pool.query(`UPDATE tiktok_live.user SET live = true WHERE email = '${email}'`)
         res.status(200).send({ message: `Connected to roomId ${state.roomId}` })
       }).catch(err => {
         console.error('Failed to connect', err);
@@ -124,10 +124,10 @@ app.get('/connectLive', (req, res) => {
         tiktokLiveConnection.on('chat', msg => socket.emit('chat', { room: `room_${username}`, message: msg }));
         tiktokLiveConnection.on('gift', msg => {
           socket.emit('gift', { room: `room_${username}`, message: msg });
-          pool.query(`SELECT * FROM aktivitas WHERE email = '${email}' AND username_tiktok = '${username}' AND game = '${game}' ORDER BY no DESC`, (error, resultsCekAktivitas) => {
-            let gift = resultsCekAktivitas[0].total_gift
+          pool.query(`SELECT * FROM tiktok_live.aktivitas WHERE email = '${email}' AND username_tiktok = '${username}' AND game = '${game}' ORDER BY no DESC`, (error, resultsCekAktivitas) => {
+            let gift = resultsCekAktivitas.rows[0].total_gift
             let new_gift = Number(gift + msg.diamondCount)
-            pool.query(`UPDATE aktivitas SET total_gift = ${new_gift} WHERE no = ${resultsCekAktivitas[0].no}`)
+            pool.query(`UPDATE tiktok_live.aktivitas SET total_gift = ${new_gift} WHERE no = ${resultsCekAktivitas.rows[0].no}`)
           })
         });
         tiktokLiveConnection.on('social', msg => socket.emit('social', { room: `room_${username}`, message: msg }));
@@ -148,7 +148,7 @@ app.get('/connectLive', (req, res) => {
           if (tiktokLiveConnection) {
             tiktokLiveConnection.disconnect();
           }
-          pool.query(`UPDATE user SET live = false WHERE email = '${email}'`)
+          pool.query(`UPDATE tiktok_live.user SET live = false WHERE email = '${email}'`)
         });
       });
     }
@@ -179,14 +179,14 @@ app.post('/loginUser', (req, res) => {
   let username = req.body.username
   let password = req.body.password
 
-  pool.query(`SELECT * FROM user_login WHERE username = '${username}' AND password = '${password}'`, (error, results) => {
+  pool.query(`SELECT * FROM tiktok_live.user_login WHERE username = '${username}' AND password = '${password}'`, (error, results) => {
     if (error) {
       return res.status(400).send({
         error: 'Bad input'
       })
     }
 
-    if (results.length > 0) {
+    if (results.rows.length > 0) {
       req.session.loggedin = true;
       req.session.username = username;
       res.status(200).send({
