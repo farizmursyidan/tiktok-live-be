@@ -86,9 +86,9 @@ app.get('/connectLive', (req, res) => {
   let username = req.body.username
   let lisensi = req.body.lisensi
   let game = req.body.game
-  let email = req.body.email
+  // let email = req.body.email
 
-  pool.query(`SELECT * FROM user WHERE status = true AND email = '${email}' AND lisensi = '${lisensi}' AND game LIKE '%${game}%' AND tgl_expired > '${convertDateFormatFull(new Date())}'`, (error, resultsCekLisensi) => {
+  pool.query(`SELECT * FROM user WHERE status = true AND lisensi = '${lisensi}' AND game LIKE '%${game}%' AND tgl_expired > '${convertDateFormatFull(new Date())}'`, (error, resultsCekLisensi) => {
     if (error) {
       return res.status(400).send({
         error: 'Bad input'
@@ -101,7 +101,7 @@ app.get('/connectLive', (req, res) => {
       })
     } else {
       if (resultsCekLisensi[0].live) {
-        pool.query(`SELECT * FROM aktivitas WHERE email = '${email}' AND game = '${game}' ORDER BY no DESC`, (error, resultsCekLive) => {
+        pool.query(`SELECT * FROM aktivitas WHERE game = '${game}' ORDER BY no DESC`, (error, resultsCekLive) => {
           if (resultsCekLive.length === 0) {
             return res.status(400).send({
               error: 'Gagal connect live!'
@@ -120,9 +120,12 @@ app.get('/connectLive', (req, res) => {
             // Connect to the chat (await can be used as well)
             tiktokLiveConnection.connect().then(state => {
               console.info(`Connected to roomId ${state.roomId}`);
-              pool.query(`INSERT INTO aktivitas(email, username_tiktok, game, total_gift, tgl_live) VALUES('${email}', '${username}', '${game}', '0', '${convertDateFormatFull(new Date())}')`)
-              pool.query(`UPDATE user SET live = true WHERE email = '${email}'`)
-              res.status(200).send({ message: `Connected to roomId ${state.roomId}` })
+              pool.query(`SELECT * FROM user WHERE lisensi = '${lisensi}' AND game LIKE '%${game}%'`, (error, resultsAmbilEmail) => {
+                let email = resultsAmbilEmail[0].email;
+                pool.query(`INSERT INTO aktivitas(email, username_tiktok, game, total_gift, tgl_live) VALUES('${email}', '${username}', '${game}', '0', '${convertDateFormatFull(new Date())}')`)
+                pool.query(`UPDATE user SET live = true WHERE email = '${email}'`)
+                res.status(200).send({ message: `Connected to roomId ${state.roomId}` })
+              })
             }).catch(err => {
               console.error('Failed to connect', err);
               return res.status(400).send({ error: 'Failed to connect, ' + err })
@@ -135,10 +138,13 @@ app.get('/connectLive', (req, res) => {
               tiktokLiveConnection.on('chat', msg => socket.emit('chat', { room: `room_${username}`, message: msg }));
               tiktokLiveConnection.on('gift', msg => {
                 socket.emit('gift', { room: `room_${username}`, message: msg });
-                pool.query(`SELECT * FROM aktivitas WHERE email = '${email}' AND username_tiktok = '${username}' AND game = '${game}' ORDER BY no DESC`, (error, resultsCekAktivitas) => {
-                  let gift = resultsCekAktivitas[0].total_gift
-                  let new_gift = Number(gift + msg.diamondCount)
-                  pool.query(`UPDATE aktivitas SET total_gift = ${new_gift} WHERE no = ${resultsCekAktivitas[0].no}`)
+                pool.query(`SELECT * FROM user WHERE lisensi = '${lisensi}' AND game LIKE '%${game}%'`, (error, resultsAmbilEmail) => {
+                  let email = resultsAmbilEmail[0].email;
+                  pool.query(`SELECT * FROM aktivitas WHERE email = '${email}' AND username_tiktok = '${username}' AND game = '${game}' ORDER BY no DESC`, (error, resultsCekAktivitas) => {
+                    let gift = resultsCekAktivitas[0].total_gift
+                    let new_gift = Number(gift + msg.diamondCount)
+                    pool.query(`UPDATE aktivitas SET total_gift = ${new_gift} WHERE no = ${resultsCekAktivitas[0].no}`)
+                  })
                 })
               });
               tiktokLiveConnection.on('social', msg => socket.emit('social', { room: `room_${username}`, message: msg }));
@@ -174,9 +180,12 @@ app.get('/connectLive', (req, res) => {
         // Connect to the chat (await can be used as well)
         tiktokLiveConnection.connect().then(state => {
           console.info(`Connected to roomId ${state.roomId}`);
-          pool.query(`INSERT INTO aktivitas(email, username_tiktok, game, total_gift, tgl_live) VALUES('${email}', '${username}', '${game}', '0', '${convertDateFormatFull(new Date())}')`)
-          pool.query(`UPDATE user SET live = true WHERE email = '${email}'`)
-          res.status(200).send({ message: `Connected to roomId ${state.roomId}` })
+          pool.query(`SELECT * FROM user WHERE lisensi = '${lisensi}' AND game LIKE '%${game}%'`, (error, resultsAmbilEmail) => {
+            let email = resultsAmbilEmail[0].email;
+            pool.query(`INSERT INTO aktivitas(email, username_tiktok, game, total_gift, tgl_live) VALUES('${email}', '${username}', '${game}', '0', '${convertDateFormatFull(new Date())}')`)
+            pool.query(`UPDATE user SET live = true WHERE email = '${email}'`)
+            res.status(200).send({ message: `Connected to roomId ${state.roomId}` })
+          })
         }).catch(err => {
           console.error('Failed to connect', err);
           return res.status(400).send({ error: 'Failed to connect, ' + err })
@@ -189,10 +198,13 @@ app.get('/connectLive', (req, res) => {
           tiktokLiveConnection.on('chat', msg => socket.emit('chat', { room: `room_${username}`, message: msg }));
           tiktokLiveConnection.on('gift', msg => {
             socket.emit('gift', { room: `room_${username}`, message: msg });
-            pool.query(`SELECT * FROM aktivitas WHERE email = '${email}' AND username_tiktok = '${username}' AND game = '${game}' ORDER BY no DESC`, (error, resultsCekAktivitas) => {
-              let gift = resultsCekAktivitas[0].total_gift
-              let new_gift = Number(gift + msg.diamondCount)
-              pool.query(`UPDATE aktivitas SET total_gift = ${new_gift} WHERE no = ${resultsCekAktivitas[0].no}`)
+            pool.query(`SELECT * FROM user WHERE lisensi = '${lisensi}' AND game LIKE '%${game}%'`, (error, resultsAmbilEmail) => {
+              let email = resultsAmbilEmail[0].email;
+              pool.query(`SELECT * FROM aktivitas WHERE email = '${email}' AND username_tiktok = '${username}' AND game = '${game}' ORDER BY no DESC`, (error, resultsCekAktivitas) => {
+                let gift = resultsCekAktivitas[0].total_gift
+                let new_gift = Number(gift + msg.diamondCount)
+                pool.query(`UPDATE aktivitas SET total_gift = ${new_gift} WHERE no = ${resultsCekAktivitas[0].no}`)
+              })
             })
           });
           tiktokLiveConnection.on('social', msg => socket.emit('social', { room: `room_${username}`, message: msg }));
