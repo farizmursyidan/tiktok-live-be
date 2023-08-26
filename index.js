@@ -233,25 +233,38 @@ app.get('/connectLive', (req, res) => {
   })
 })
 
-///////////
-// let server = http.createServer(app)
-// server.listen(8081)
+app.post('/connectLiveReact', (req, res) => {
+  let username = req.body.username
+  let tiktokUsername = username;
+  let tiktokLiveConnection = new WebcastPushConnection(tiktokUsername);
 
-// const io = new Server(server, {
-//   cors: {
-//     origin: '*'
-//   }
-// });
+  tiktokLiveConnection.connect().then(state => {
+    console.info(`Connected to roomId ${state.roomId}`);
+    res.status(200).send({ message: `Connected to roomId ${state.roomId}` })
+  }).catch(err => {
+    console.error('Failed to connect', err);
+    return res.status(400).send({ error: 'Failed to connect, ' + err })
+  })
 
-// io.on('connection', (socket) => {
-//   // socket.join("room1");
-//   // io.to("room1").emit("event", { room: 'room1', message: 'hello room1!' });
-//   // socket.join("room2");
-//   // io.to("room2").emit("event", { room: 'room2', message: 'hello room2!' });
-//   socket.emit('event', { room: 'room1', message: 'test1' })
-//   socket.emit('event', { room: 'room2', message: 'test2' })
-// })
-///////////
+  io.on('connection', (socket) => {
+    tiktokLiveConnection.on('chat', msg => socket.emit('chat', { room: `room_${username}`, message: msg }));
+    tiktokLiveConnection.on('roomUser', msg => socket.emit('roomUser', { room: `room_${username}`, message: msg }));
+    tiktokLiveConnection.on('member', msg => socket.emit('member', { room: `room_${username}`, message: msg }));
+    tiktokLiveConnection.on('chat', msg => socket.emit('chat', { room: `room_${username}`, message: msg }));
+    tiktokLiveConnection.on('gift', msg => { socket.emit('gift', { room: `room_${username}`, message: msg }); });
+    tiktokLiveConnection.on('social', msg => socket.emit('social', { room: `room_${username}`, message: msg }));
+    tiktokLiveConnection.on('like', msg => socket.emit('like', { room: `room_${username}`, message: msg }));
+    tiktokLiveConnection.on('questionNew', msg => socket.emit('questionNew', { room: `room_${username}`, message: msg }));
+    tiktokLiveConnection.on('linkMicBattle', msg => socket.emit('linkMicBattle', { room: `room_${username}`, message: msg }));
+    tiktokLiveConnection.on('linkMicArmies', msg => socket.emit('linkMicArmies', { room: `room_${username}`, message: msg }));
+    tiktokLiveConnection.on('liveIntro', msg => socket.emit('liveIntro', { room: `room_${username}`, message: msg }));
+    tiktokLiveConnection.on('emote', msg => socket.emit('emote', { room: `room_${username}`, message: msg }));
+    tiktokLiveConnection.on('envelope', msg => socket.emit('envelope', { room: `room_${username}`, message: msg }));
+    tiktokLiveConnection.on('subscribe', msg => socket.emit('subscribe', { room: `room_${username}`, message: msg }));
+    tiktokLiveConnection.on('disconnected', reason => socket.emit('disconnected', `TikTok connection disconnected ${reason}`));
+    tiktokLiveConnection.on('streamEnd', () => { socket.emit('streamEnd', 'live selesai'); });
+  });
+})
 
 app.post('/loginUser', (req, res) => {
   let username = req.body.username
