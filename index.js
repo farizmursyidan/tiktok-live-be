@@ -82,10 +82,10 @@ const io = new Server(server, {
   }
 });
 
-app.get('/connectLive', (req, res) => {
-  let username = req.body.username
-  let lisensi = req.body.lisensi
-  let game = req.body.game
+app.get('/connectLive/:username/:lisensi/:game', (req, res) => {
+  let username = req.params.username
+  let lisensi = req.params.lisensi
+  let game = req.params.game
   // let email = req.body.email
 
   pool.query(`SELECT * FROM user WHERE status = true AND lisensi = '${lisensi}' AND game LIKE '%${game}%' AND tgl_expired > '${convertDateFormatFull(new Date())}'`, (error, resultsCekLisensi) => {
