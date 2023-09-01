@@ -172,7 +172,6 @@ app.post('/connectLiveReact', (req, res) => {
     tiktokLiveConnection.on('chat', msg => socket.emit('chat', { room: `room_${username}`, message: msg }));
     tiktokLiveConnection.on('roomUser', msg => socket.emit('roomUser', { room: `room_${username}`, message: msg }));
     tiktokLiveConnection.on('member', msg => socket.emit('member', { room: `room_${username}`, message: msg }));
-    tiktokLiveConnection.on('chat', msg => socket.emit('chat', { room: `room_${username}`, message: msg }));
     tiktokLiveConnection.on('gift', msg => { socket.emit('gift', { room: `room_${username}`, message: msg }); });
     tiktokLiveConnection.on('social', msg => socket.emit('social', { room: `room_${username}`, message: msg }));
     tiktokLiveConnection.on('like', msg => socket.emit('like', { room: `room_${username}`, message: msg }));
